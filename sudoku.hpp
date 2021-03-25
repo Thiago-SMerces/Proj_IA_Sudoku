@@ -8,6 +8,7 @@
 #include <fstream>
 #include <vector>
 #include <queue>
+#include <stack>
 
 /* 
 * Macro to define default sudoku LEN, as for now, it will always assume
@@ -30,7 +31,8 @@ typedef struct State
     int costG;
     int costH;
     bool solved;
-    std::vector<int> valid_numbers  = {49, 50, 51, 52, 53, 54, 55, 56, 57, 58};
+    // AC3 default domain
+    std::vector<int> valid_numbers;
 
     // define default operator so priority queue may work
     bool operator<(const State& next) const
@@ -51,7 +53,11 @@ class Solver
 
     // check if sudoku matrix is the goal (fully filled with non-clashing numbers)
     bool isGoal(State state);
+};
 
+class Uninformed_Searches
+{
+    public:
     // check if the number we are trying to assign does not conflict with the row, column or square
     bool isValid(State state, int row, int col, int number);
 
@@ -62,8 +68,25 @@ class Solver
     int numbersInRegion(State state, int row, int col);
 };
 
+class Informed_Searches
+{
+    public:
+    // to continue with the idea of continuously solving the matrix
+    // use pointers instead of direct copies of values to find the
+    // dot location (coordinates). Returns bool so we can know if 
+    // there is still a dot or not on the matrix
+    // This function also selects the most constrained value
+    // as the next candidate to replace instead of randomly 
+    // trying values
+    bool findDot(State *state, int* i, int* j);
+
+    // literally the same function defined in the Uninformed class,
+    // but it accepts a pointer to the state we are solving
+    bool isValid(State* state, int row, int col, int number);
+};
+
 // class to implement bfs search to solve sudoku
-class BFS : public Solver
+class BFS : public Solver, Uninformed_Searches
 {
     public:
     // solve problem using breadth-first search (bfs)
@@ -77,7 +100,7 @@ class BFS : public Solver
 };
 
 // class to implement dfs search to solve sudoku
-class DFS : public Solver
+class DFS : public Solver, Uninformed_Searches
 {
     public:
     // solve problem using depth-first search (dfs)
@@ -91,7 +114,7 @@ class DFS : public Solver
 };
 
 // class to implement a* search to solve sudoku
-class AStar : public Solver
+class AStar : public Solver, Uninformed_Searches
 {
     public:
     // solve problem using a star search (a*)
@@ -105,49 +128,47 @@ class AStar : public Solver
 };
 
 // class to implement backtracking search to solve sudoku
-class BACK : public Solver
+class BACK : public Solver, Informed_Searches
 {
     public:
-    // to continue with the idea of continuously solving the matrix
-    // use pointers instead of direct copies of values to find the
-    // dot location (coordinates). Returns bool so we can know if 
-    // there is still a dot or not on the matrix
-    bool findDot(State *state, int* i, int* j);
-
-    // literally the same function defined in the parent class,
-    // but it accepts a pointer to the state we are solving
-    bool isValid(State* state, int row, int col, int number);
-
     // solve problem using backtracking
     // i and j are optional parameters (defined in the source code)
     // since we want a continuos solution to a state instead of creating
     // new ones
-    void back(State* problem, int i, int j);
+    void back(State* problem);
 
     // overwrite default Solver initializer to solve problem using backtracking
     // this one needs a little more set up, since we need the problem to 
     // be returned as a State instead of a pointer to keep the code working
     State solve(State problem)
     {
-        back(&problem, 0, 0);
+        back(&problem);
         return problem;
     }
 };
 
 // class to implement ac3 search to solve sudoku
-class AC3 : public Solver
+class AC3 : public Solver, Informed_Searches
 {
+    // default domain
+    std::vector<int> D;
+
     public:
     // solve problem using as a Constraint Satisfaction Problem
     State ac3(State problem);
 
+    // revise function
+    int revise(State* X1, int i, int j);
+
     // overwrite default Solver initializer to solve problem using ac3
     State solve(State problem)
     {
-        // problem.valid_numbers = {49, 50, 51, 52, 53, 54, 55, 56, 57, 58};
-        // problemac3(problem);
+        for (int i = 0; i < 10; i++)
+            D[i] = i + 49;
+        problem.valid_numbers = D;
         return ac3(problem);
     }
+    AC3() : D(10) {}
 };
 
 #endif

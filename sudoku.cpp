@@ -30,7 +30,7 @@ void Solver::printSudoku(char matrix[LEN][LEN])
     for (int i = 0; i < LEN; i++)
         for (int j = 0; j < LEN; j++)
             cout << matrix[i][j];
-        
+
     cout << endl;
 }
 
@@ -40,11 +40,11 @@ bool Solver::isGoal(State state)
         for (int j = 0; j < LEN; j++)
             if (state.sudoku_matrix[i][j] == 46)
                 return false;
-        
+
     return true;
 }
 
-bool Solver::isValid(State state, int row, int col, int number)
+bool Uninformed_Searches::isValid(State state, int row, int col, int number)
 {
     for (int i = 0; i < LEN; i++)
         if (state.sudoku_matrix[row][i] == number)
@@ -63,7 +63,7 @@ bool Solver::isValid(State state, int row, int col, int number)
     return true;
 }
 
-int* Solver::findDot(State state)
+int* Uninformed_Searches::findDot(State state)
 {
     int* ret = new int[2];
     ret[0] = -1;
@@ -71,7 +71,7 @@ int* Solver::findDot(State state)
     for (int i = 0; i < LEN; i++)
     {
         for (int j = 0; j < LEN; j++)
-        { 
+        {
             if (state.sudoku_matrix[i][j] == 46)
             {
                 ret[0] = i;
@@ -83,7 +83,7 @@ int* Solver::findDot(State state)
     return ret;
 }
 
-int Solver::numbersInRegion(State state, int row, int col)
+int Uninformed_Searches::numbersInRegion(State state, int row, int col)
 {
     int numbersInRegion = 0;
     vector<int> coordinatesI;
@@ -286,46 +286,57 @@ State AStar::aStar(State problem)
     return node;
 }
 
-bool BACK::findDot(State *state, int* i, int* j)
+bool Informed_Searches::findDot(State *state, int* i, int* j)
 {
-    while (*i < LEN)
+    int cont = 0;
+    int most_constraining = 9;
+    bool found = false;
+    for (int row = 0; row < LEN; row++)
     {
-        while (*j < LEN)
+        for (int column = 0; column < LEN; column++)
         {
-            if (state->sudoku_matrix[*i][*j] == 46)
-                return true;
-            (*j)++;
+            cont = 0;
+            if (state->sudoku_matrix[row][column] == 46)
+            {
+                for (int number = 49; number < 58; number++)
+                {
+                    if (isValid(state, row, column, number))
+                        cont++;
+                }
+                if (most_constraining > cont)
+                {
+                    most_constraining = cont;
+                    *i = row;
+                    *j = column;
+                }
+                found = true;
+            }
         }
-        *j = 0;
-        (*i)++;
     }
-    return false;
+    return found;
 }
 
-bool BACK::isValid(State* state, int row, int col, int number)
+bool Informed_Searches::isValid(State* state, int row, int col, int number)
 {
-    for (int i = 0; i < LEN; i++)
-        if (state->sudoku_matrix[row][i] == number)
-            return false;
-
-    for (int j = 0; j < LEN; j++)
-        if (state->sudoku_matrix[j][col] == number)
+    int i, j;
+    for (i = 0; i < LEN; i++)
+        if (state->sudoku_matrix[row][i] == number || state->sudoku_matrix[i][col] == number)
             return false;
 
     int startI = row - row % 3, startJ = col - col % 3;
-    for (int i = 0; i < 3; i++)
-        for (int j = 0; j < 3; j++)
+    for (i = 0; i < 3; i++)
+        for (j = 0; j < 3; j++)
             if (state->sudoku_matrix[i + startI][j + startJ] == number)
                 return false;
 
     return true;
 }
 
-void BACK::back(State* cps, int i = 0, int j = 0)
+void BACK::back(State* cps)
 {
-    bool coord = findDot(cps, &i, &j);
+    int i = 0, j = 0;
     // check if there are empty spots on matrix, if not we found the solution
-    if (!coord)
+    if (!findDot(cps, &i, &j))
     {
         cps->solved = true;
         return;
@@ -339,7 +350,7 @@ void BACK::back(State* cps, int i = 0, int j = 0)
             cps->sudoku_matrix[i][j] = number;
             // call recursively starting at coordinates from previous call
             // instead of 0
-            back(cps, i, j);
+            back(cps);
             // if matrix is solved, return to finish recursion
             if (cps->solved) 
                 return;
@@ -348,6 +359,137 @@ void BACK::back(State* cps, int i = 0, int j = 0)
     }
     cps->solved = false;
     return;
+}
+
+int AC3::revise(State* X1, int i, int j)
+{
+    // look for valid positions to fill
+    findDot(X1, &i, &j);
+    int revised = 0;
+    for (int number = 49; number < 58; number++)
+    {
+        for (int row = 0; row < LEN; row++)
+        {
+            if (X1->sudoku_matrix[i][row] == number)
+            {
+                revised = number;
+                break;
+            }
+        }
+
+        for (int col = 0; col < LEN; col++)
+        {
+            if (X1->sudoku_matrix[col][j] == number)
+            {
+                revised = number;
+                break;
+            }
+        }        
+
+        int startI = i - i % 3, startJ = j - j % 3;
+        for (int row = 0; row < 3; row++)
+        {
+            for (int col = 0; col < 3; col++)
+            {
+                if (X1->sudoku_matrix[row + startI][col + startJ] == number)
+                {
+                    revised = number;
+                    break;
+                }
+            }
+        }
+
+        if (revised != 0)
+            break;
+    }
+
+    if (revised != 0)
+    {
+        vector<int>::iterator iter;
+        for (iter = X1->valid_numbers.begin(); 
+            iter != X1->valid_numbers.end(); iter++ )
+        {
+            if (*iter == revised)
+            {
+                X1->valid_numbers.erase(iter);
+                break;
+            }
+        }
+    }
+    return 0;
+}
+
+State AC3::ac3(State problem) 
+{
+    Node node = problem;
+    // check if state is already solved
+    if (isGoal(node))
+    {
+        node.solved = true;
+        return node;        
+    }
+    stack<Node> stack;
+    stack.push(node);
+
+    while (!stack.empty())
+    {
+        node = stack.top();
+        stack.pop();
+        int i = 0, j = 0;
+        bool haveDot = findDot(&node, &i, &j);
+
+        // this step ultimately replaces isGoal since it checks the entire matrix for empty spots
+        if (!haveDot)
+        {
+            node.solved = true;
+            return node;
+        }
+
+        // copy matrix beforehand to avoid copying it for every valid number
+        Node child;
+        child.valid_numbers = D;
+        for (int i = 0; i < LEN; i++)
+        {
+            for (int j = 0; j < LEN; j++)
+                child.sudoku_matrix[i][j] = node.sudoku_matrix[i][j];
+            child.valid_numbers[i] = i + 49;
+        }
+
+        for (int number = node.valid_numbers[0]; number < node.valid_numbers.back(); number++)
+        {
+            // node.valid_numbers.push_back(number);
+            if (isValid(&node, i, j, number))
+            {
+                // reduce valid domain for each child of this node
+                child.sudoku_matrix[i][j] = number;
+
+                // this call as well as the one present in revise, 
+                // effectively reduces the domain we are accessing
+                // by removing the invalid number from the vector
+                vector<int>::iterator iter;
+                for (iter = child.valid_numbers.begin(); 
+                    iter != child.valid_numbers.end(); iter++ )
+                {
+                    if (*iter == number)
+                    {
+                        child.valid_numbers.erase(iter);
+                        break;
+                    }
+                }
+                // call revise for as long as there are conflicting values
+                int revised = revise(&child, i, j);
+                while (revised != 0)
+                {
+                    revised = revise(&child, i, j);
+                }
+                stack.push(child);   
+                child.sudoku_matrix[i][j] = 46;
+                child.valid_numbers = node.valid_numbers;
+            }
+        }
+    }
+    node.solved = false;
+    return node;
 }
 
 int main(int argc, char** argv)
@@ -375,6 +517,8 @@ int main(int argc, char** argv)
         sol = new AStar();
     else if (strcmp(argv[1], "backtracking") == 0 || strcmp(argv[1], "back") == 0)
         sol = new BACK();
+    else if (strcmp(argv[1], "ac3") == 0)
+        sol = new AC3();
     // if no known method is specified, return error message and close program
     else
     {
@@ -409,8 +553,9 @@ int main(int argc, char** argv)
                 sol->printSudoku(solved.sudoku_matrix);
             // if not, print message
             else
-                cout << "Sorry, could not find solution for given sudoku at line " << line_number << endl;
+                printf("Sorry, could not find solution for given sudoku at line %d\n", line_number);
         }
+
         // once whole file is read, close it
         entry.close();
     }
@@ -418,7 +563,7 @@ int main(int argc, char** argv)
     // if could not open file, print error message and close program
     else
     {
-        cerr << "Unable to open requested file. " << strerror(errno) << endl;
+        fprintf(stderr, "Unable to open requested file. %s\n", strerror(errno));
         delete sol;
         return -1;
     }
